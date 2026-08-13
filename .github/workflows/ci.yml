@@ -8,7 +8,7 @@ on:
 
 jobs:
   backend-tests:
-    name: Backend Pytest & Linting
+    name: Backend Pytest & Verification
     runs-on: ubuntu-latest
 
     services:
@@ -43,22 +43,23 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: '3.12'
           cache: 'pip'
+          cache-dependency-path: 'backend/requirements.txt'
 
-      - name: Install Dependencies
+      - name: Install Backend Dependencies
+        working-directory: backend
         run: |
-          cd smartmes/backend
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Run Backend Tests
+      - name: Run Backend Pytest Suite
+        working-directory: backend
         env:
           DATABASE_URL: postgresql+asyncpg://smartmes:smartmes_secret_pass@localhost:5432/smartmes_db
           REDIS_URL: redis://localhost:6379/0
           JWT_SECRET: ci_secret_key_for_testing_purposes_only
         run: |
-          cd smartmes/backend
           pytest
 
   frontend-build:
@@ -72,16 +73,16 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
           cache: 'npm'
-          cache-dependency-path: smartmes/frontend/package.json
+          cache-dependency-path: 'frontend/package-lock.json'
 
       - name: Install Frontend Dependencies
+        working-directory: frontend
         run: |
-          cd smartmes/frontend
-          npm ci || npm install
+          npm ci
 
       - name: Build Next.js Application
+        working-directory: frontend
         run: |
-          cd smartmes/frontend
           npm run build
