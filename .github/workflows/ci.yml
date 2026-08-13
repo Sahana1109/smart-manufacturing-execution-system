@@ -1,0 +1,87 @@
+name: SmartMES Continuous Integration
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  backend-tests:
+    name: Backend Pytest & Linting
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: smartmes
+          POSTGRES_PASSWORD: smartmes_secret_pass
+          POSTGRES_DB: smartmes_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install Dependencies
+        run: |
+          cd smartmes/backend
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run Backend Tests
+        env:
+          DATABASE_URL: postgresql+asyncpg://smartmes:smartmes_secret_pass@localhost:5432/smartmes_db
+          REDIS_URL: redis://localhost:6379/0
+          JWT_SECRET: ci_secret_key_for_testing_purposes_only
+        run: |
+          cd smartmes/backend
+          pytest
+
+  frontend-build:
+    name: Frontend Build & Verification
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: smartmes/frontend/package.json
+
+      - name: Install Frontend Dependencies
+        run: |
+          cd smartmes/frontend
+          npm ci || npm install
+
+      - name: Build Next.js Application
+        run: |
+          cd smartmes/frontend
+          npm run build

@@ -1,0 +1,91 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: smartmes_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-smartmes}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-smartmes_secret_pass}
+      POSTGRES_DB: ${POSTGRES_DB:-smartmes_db}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-smartmes} -d ${POSTGRES_DB:-smartmes_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - smartmes_network
+
+  redis:
+    image: redis:7-alpine
+    container_name: smartmes_redis
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - smartmes_network
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: ../docker/Dockerfile.backend
+    container_name: smartmes_backend
+    restart: always
+    ports:
+      - "8000:8000"
+    environment:
+      - ENVIRONMENT=${ENVIRONMENT:-development}
+      - DEBUG=${DEBUG:-True}
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-smartmes}:${POSTGRES_PASSWORD:-smartmes_secret_pass}@postgres:5432/${POSTGRES_DB:-smartmes_db}
+      - REDIS_URL=redis://redis:6379/0
+      - JWT_SECRET=${JWT_SECRET:-super_secret_smartmes_jwt_key_change_in_production_32bytes_minimum!}
+      - JWT_ALGORITHM=${JWT_ALGORITHM:-HS256}
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c 'import urllib.request; urllib.request.urlopen(\"http://localhost:8000/api/v1/health\")'"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    networks:
+      - smartmes_network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: ../docker/Dockerfile.frontend
+    container_name: smartmes_frontend
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_BASE_URL=http://localhost:8000/api/v1
+    depends_on:
+      - backend
+    networks:
+      - smartmes_network
+
+networks:
+  smartmes_network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
