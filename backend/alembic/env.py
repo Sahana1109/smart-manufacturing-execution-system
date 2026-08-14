@@ -7,6 +7,8 @@ from alembic import context
 
 from app.core.config import settings
 from app.db.base import Base
+import app.modules.users.models  # noqa: F401
+import app.modules.roles.models  # noqa: F401
 
 # Alembic Config object
 config = context.config
