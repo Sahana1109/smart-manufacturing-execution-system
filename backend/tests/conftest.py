@@ -11,8 +11,8 @@ from app.core.database import get_db
 from app.core.security import get_password_hash, create_access_token
 from app.modules.users.models import User
 from app.modules.roles.models import Role
+from app.modules.products.models import Product
 
-# In-memory SQLite async database engine for isolated Pytest execution
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
 
 test_engine = create_async_engine(
@@ -40,9 +40,12 @@ async def db_session() -> AsyncGenerator[AsyncSession, None]:
 
     async with TestingSessionLocal() as session:
         # Seed test roles
-        admin_role = Role(name="ADMIN", description="Administrator")
-        operator_role = Role(name="OPERATOR", description="Shop-Floor Operator")
-        session.add_all([admin_role, operator_role])
+        admin_role = Role(id=1, name="ADMIN", description="Administrator")
+        manager_role = Role(id=2, name="PRODUCTION_MANAGER", description="Production Manager")
+        supervisor_role = Role(id=3, name="SUPERVISOR", description="Supervisor")
+        operator_role = Role(id=4, name="OPERATOR", description="Shop-Floor Operator")
+        inspector_role = Role(id=5, name="QUALITY_INSPECTOR", description="Quality Inspector")
+        session.add_all([admin_role, manager_role, supervisor_role, operator_role, inspector_role])
         await session.commit()
 
         yield session
@@ -69,16 +72,26 @@ async def async_client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, 
 
 
 @pytest_asyncio.fixture
-async def sample_admin(db_session: AsyncSession) -> User:
+async def sample_product(db_session: AsyncSession) -> Product:
     """
-    Fixture creating an active Admin user.
+    Fixture creating an active test product.
     """
-    admin_role_res = await db_session.execute(
-        Role.__table__.select().where(Role.name == "ADMIN")
+    prod = Product(
+        product_code="TEST-PRD-001",
+        name="Test Gear Assembly",
+        description="Active test product",
+        unit_of_measure="PCS",
+        is_active=True
     )
-    # Fetch role instance
-    admin_role = (await db_session.get(Role, 1))
+    db_session.add(prod)
+    await db_session.commit()
+    await db_session.refresh(prod)
+    return prod
 
+
+@pytest_asyncio.fixture
+async def sample_admin(db_session: AsyncSession) -> User:
+    admin_role = await db_session.get(Role, 1)
     user = User(
         email="admin@test.com",
         username="admin_user",
@@ -95,12 +108,26 @@ async def sample_admin(db_session: AsyncSession) -> User:
 
 
 @pytest_asyncio.fixture
-async def sample_operator(db_session: AsyncSession) -> User:
-    """
-    Fixture creating an active Operator user.
-    """
-    operator_role = (await db_session.get(Role, 2))
+async def sample_manager(db_session: AsyncSession) -> User:
+    manager_role = await db_session.get(Role, 2)
+    user = User(
+        email="manager@test.com",
+        username="prod_manager",
+        password_hash=get_password_hash("ManagerPass123!"),
+        first_name="Production",
+        last_name="Manager",
+        is_active=True,
+        roles=[manager_role] if manager_role else []
+    )
+    db_session.add(user)
+    await db_session.commit()
+    await db_session.refresh(user)
+    return user
 
+
+@pytest_asyncio.fixture
+async def sample_operator(db_session: AsyncSession) -> User:
+    operator_role = await db_session.get(Role, 4)
     user = User(
         email="operator@test.com",
         username="operator_user",
@@ -118,17 +145,17 @@ async def sample_operator(db_session: AsyncSession) -> User:
 
 @pytest_asyncio.fixture
 def admin_token_headers(sample_admin: User) -> dict:
-    """
-    Returns Authorization Bearer header dict for Admin user.
-    """
     token = create_access_token(subject=sample_admin.id)
     return {"Authorization": f"Bearer {token}"}
 
 
 @pytest_asyncio.fixture
+def manager_token_headers(sample_manager: User) -> dict:
+    token = create_access_token(subject=sample_manager.id)
+    return {"Authorization": f"Bearer {token}"}
+
+
+@pytest_asyncio.fixture
 def operator_token_headers(sample_operator: User) -> dict:
-    """
-    Returns Authorization Bearer header dict for Operator user.
-    """
     token = create_access_token(subject=sample_operator.id)
     return {"Authorization": f"Bearer {token}"}
