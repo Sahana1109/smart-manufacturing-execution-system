@@ -9,6 +9,9 @@ from app.core.config import settings
 from app.db.base import Base
 import app.modules.users.models  # noqa: F401
 import app.modules.roles.models  # noqa: F401
+import app.modules.products.models  # noqa: F401
+import app.modules.production_planning.models  # noqa: F401
+import app.modules.audit_logs.models  # noqa: F401
 
 # Alembic Config object
 config = context.config
