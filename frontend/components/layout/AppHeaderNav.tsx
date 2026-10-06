@@ -30,7 +30,10 @@ export default function AppHeaderNav() {
         </div>
 
         <nav id="header-nav" className="flex items-center space-x-6 text-sm font-medium">
-          <Link href="/" className="text-cyan-400 transition-colors hover:text-cyan-300">
+          <Link href="/dashboard" className="text-cyan-400 font-semibold hover:text-cyan-300 transition-colors">
+            Dashboard
+          </Link>
+          <Link href="/" className="text-slate-300 hover:text-cyan-300 transition-colors">
             Overview
           </Link>
           <Link href="/production-plans" className="text-slate-300 hover:text-cyan-300 transition-colors">
