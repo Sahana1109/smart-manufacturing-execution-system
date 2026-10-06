@@ -49,7 +49,8 @@ async def db_session() -> AsyncGenerator[AsyncSession, None]:
         supervisor_role = Role(id=3, name="SUPERVISOR", description="Supervisor")
         operator_role = Role(id=4, name="OPERATOR", description="Shop-Floor Operator")
         inspector_role = Role(id=5, name="QUALITY_INSPECTOR", description="Quality Inspector")
-        session.add_all([admin_role, manager_role, supervisor_role, operator_role, inspector_role])
+        inventory_role = Role(id=6, name="INVENTORY_MANAGER", description="Inventory Manager")
+        session.add_all([admin_role, manager_role, supervisor_role, operator_role, inspector_role, inventory_role])
         await session.commit()
 
         yield session
@@ -261,4 +262,29 @@ async def sample_inspector(db_session: AsyncSession) -> User:
 def inspector_token_headers(sample_inspector: User) -> dict:
     token = create_access_token(subject=sample_inspector.id)
     return {"Authorization": f"Bearer {token}"}
+
+
+@pytest_asyncio.fixture
+async def sample_inventory_manager(db_session: AsyncSession) -> User:
+    inv_role = await db_session.get(Role, 6)
+    user = User(
+        email="inventory@test.com",
+        username="inventory_manager",
+        password_hash=get_password_hash("InventoryPass123!"),
+        first_name="Inventory",
+        last_name="Manager",
+        is_active=True,
+        roles=[inv_role] if inv_role else []
+    )
+    db_session.add(user)
+    await db_session.commit()
+    await db_session.refresh(user)
+    return user
+
+
+@pytest_asyncio.fixture
+def inventory_manager_token_headers(sample_inventory_manager: User) -> dict:
+    token = create_access_token(subject=sample_inventory_manager.id)
+    return {"Authorization": f"Bearer {token}"}
+
 
