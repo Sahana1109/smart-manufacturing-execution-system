@@ -251,3 +251,63 @@ export interface InventoryDashboardSummary {
   low_stock_count: number;
   total_reserved_quantity: number;
 }
+
+export interface ProductionReport {
+  total_work_orders: number;
+  pending: number;
+  in_progress: number;
+  paused: number;
+  completed: number;
+  closed: number;
+  cancelled: number;
+  completion_percentage: number;
+  total_planned_quantity: number;
+  total_produced_quantity: number;
+}
+
+export interface QualityReport {
+  total_inspections: number;
+  pending: number;
+  passed: number;
+  failed: number;
+  rework_required: number;
+  total_inspected_quantity: number;
+  total_accepted_quantity: number;
+  total_rejected_quantity: number;
+  total_defects: number;
+}
+
+export interface InventoryReport {
+  total_materials: number;
+  total_stock_items: number;
+  total_quantity: number;
+  total_reserved_quantity: number;
+  total_available_quantity: number;
+  low_stock_count: number;
+  low_stock_materials: Material[];
+  recent_movements: StockMovement[];
+}
+
+export interface MachineReport {
+  total_machines: number;
+  operational: number;
+  in_use: number;
+  maintenance: number;
+  inactive: number;
+}
+
+export interface OperatorReport {
+  total_operators: number;
+  active_operators: number;
+  assigned_operators: number;
+  unassigned_operators: number;
+}
+
+export interface DashboardSummary {
+  production: ProductionReport;
+  quality: QualityReport;
+  inventory: InventoryReport;
+  machines: MachineReport;
+  operators: OperatorReport;
+}
+

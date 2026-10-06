@@ -9,6 +9,7 @@ from app.modules.employees import router as employees_router
 from app.modules.work_orders import router as work_orders_router
 from app.modules.quality import router as quality_router
 from app.modules.inventory import router as inventory_router
+from app.modules.reports import router as reports_router
 
 api_router = APIRouter()
 
@@ -35,5 +36,9 @@ api_router.include_router(quality_router.router, prefix="/quality", tags=["Quali
 
 # Inventory & Material Tracking
 api_router.include_router(inventory_router.router, prefix="/inventory", tags=["Inventory & Material Tracking"])
+
+# Reports & Management Dashboards
+api_router.include_router(reports_router.router, prefix="/reports", tags=["Reports & Management Dashboards"])
+
 
 
