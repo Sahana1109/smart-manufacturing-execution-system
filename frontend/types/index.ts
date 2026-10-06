@@ -6,7 +6,7 @@ export type ProductionPlanStatus = "DRAFT" | "PLANNED" | "IN_PROGRESS" | "COMPLE
 
 export type ProductionPlanPriority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
 
-export type MachineStatus = "OPERATIONAL" | "IDLE" | "MAINTENANCE" | "OFFLINE" | "ERROR";
+export type MachineStatus = "OPERATIONAL" | "AVAILABLE" | "IN_USE" | "MAINTENANCE" | "INACTIVE";
 
 export interface Role {
   id: number;
@@ -74,6 +74,22 @@ export interface Employee {
   updated_at: string;
 }
 
+export interface DowntimeRecord {
+  id: string;
+  work_order_id: string;
+  machine_id?: string;
+  machine?: Machine;
+  start_time: string;
+  end_time?: string;
+  duration_minutes?: number;
+  reason: string;
+  remarks?: string;
+  recorded_by_id?: string;
+  recorded_by?: User;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface WorkOrder {
   id: string;
   work_order_number: string;
@@ -82,8 +98,13 @@ export interface WorkOrder {
   product_id: string;
   product?: Product;
   planned_quantity: number;
+  produced_quantity: number;
+  remaining_quantity?: number;
+  progress_percentage?: number;
   start_date: string;
   due_date: string;
+  actual_start_time?: string;
+  actual_completion_time?: string;
   priority: WorkOrderPriority;
   status: WorkOrderStatus;
   notes?: string;
@@ -93,8 +114,15 @@ export interface WorkOrder {
   assigned_machine?: Machine;
   assigned_employee_id?: string;
   assigned_employee?: Employee;
+  downtime_records?: DowntimeRecord[];
   created_at: string;
   updated_at: string;
+}
+
+export interface WorkOrderExecution {
+  work_order: WorkOrder;
+  downtime_records: DowntimeRecord[];
+  total_downtime_minutes: number;
 }
 
 export interface PaginatedProductionPlans {

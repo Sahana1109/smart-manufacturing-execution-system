@@ -1,18 +1,24 @@
 import uuid
 import math
-from typing import List, Optional, Tuple
-from datetime import datetime, date
+from typing import List, Optional, Tuple, Dict, Any
+from datetime import datetime, date, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, or_, and_
 from sqlalchemy.orm import selectinload
 from fastapi import HTTPException, status
 
-from app.modules.work_orders.models import WorkOrder, WorkOrderStatus, WorkOrderPriority
+from app.modules.work_orders.models import WorkOrder, WorkOrderStatus, WorkOrderPriority, DowntimeRecord
 from app.modules.production_planning.models import ProductionPlan
 from app.modules.products.models import Product
 from app.modules.machines.models import Machine
 from app.modules.employees.models import Employee
-from app.modules.work_orders.schemas import WorkOrderCreate, WorkOrderUpdate, WorkOrderAssignRequest
+from app.modules.work_orders.schemas import (
+    WorkOrderCreate,
+    WorkOrderUpdate,
+    WorkOrderAssignRequest,
+    WorkOrderCompleteRequest,
+    DowntimeRecordCreate,
+)
 from app.modules.audit_logs.service import log_audit_event
 
 ALLOWED_WO_STATUS_TRANSITIONS = {
@@ -169,7 +175,9 @@ async def get_work_order_by_id(db: AsyncSession, order_id: uuid.UUID) -> WorkOrd
             selectinload(WorkOrder.production_plan),
             selectinload(WorkOrder.created_by),
             selectinload(WorkOrder.assigned_machine),
-            selectinload(WorkOrder.assigned_employee)
+            selectinload(WorkOrder.assigned_employee),
+            selectinload(WorkOrder.downtime_records).selectinload(DowntimeRecord.machine),
+            selectinload(WorkOrder.downtime_records).selectinload(DowntimeRecord.recorded_by)
         )
     )
     res = await db.execute(stmt)
@@ -490,3 +498,284 @@ async def cancel_work_order(
     Cancels an existing active work order.
     """
     return await change_work_order_status(db, order_id, WorkOrderStatus.CANCELLED, user_id)
+
+
+async def start_production_execution(
+    db: AsyncSession,
+    order_id: uuid.UUID,
+    user_id: uuid.UUID,
+    user_roles: Optional[List[str]] = None
+) -> WorkOrder:
+    """
+    Starts production execution for a RELEASED work order.
+    Sets status to IN_PROGRESS, records actual_start_time, and synchronizes assigned machine status to IN_USE.
+    """
+    order = await get_work_order_by_id(db, order_id)
+
+    if order.status != WorkOrderStatus.RELEASED:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Cannot start production for work order in '{order.status.value}' status. Must be 'RELEASED'."
+        )
+
+    if order.assigned_machine and order.assigned_machine.status in ("MAINTENANCE", "INACTIVE"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Assigned machine '{order.assigned_machine.machine_code}' is currently in {order.assigned_machine.status} state."
+        )
+
+    order.status = WorkOrderStatus.IN_PROGRESS
+    if not order.actual_start_time:
+        order.actual_start_time = datetime.now(timezone.utc)
+
+    if order.assigned_machine and order.assigned_machine.status != "MAINTENANCE":
+        order.assigned_machine.status = "IN_USE"
+
+    await log_audit_event(
+        db,
+        action="WORK_ORDER_STARTED",
+        entity_type="WorkOrder",
+        entity_id=str(order.id),
+        user_id=user_id,
+        details={
+            "work_order_number": order.work_order_number,
+            "actual_start_time": str(order.actual_start_time),
+            "assigned_machine": order.assigned_machine.machine_code if order.assigned_machine else None
+        }
+    )
+
+    await db.commit()
+    return await get_work_order_by_id(db, order.id)  # type: ignore
+
+
+async def pause_production_execution(
+    db: AsyncSession,
+    order_id: uuid.UUID,
+    reason: Optional[str],
+    user_id: uuid.UUID,
+    user_roles: Optional[List[str]] = None
+) -> WorkOrder:
+    """
+    Pauses an IN_PROGRESS work order execution. Restores machine status to OPERATIONAL.
+    """
+    order = await get_work_order_by_id(db, order_id)
+
+    if order.status != WorkOrderStatus.IN_PROGRESS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Cannot pause work order in '{order.status.value}' status. Must be 'IN_PROGRESS'."
+        )
+
+    order.status = WorkOrderStatus.PAUSED
+    if order.assigned_machine and order.assigned_machine.status == "IN_USE":
+        order.assigned_machine.status = "OPERATIONAL"
+
+    await log_audit_event(
+        db,
+        action="WORK_ORDER_PAUSED",
+        entity_type="WorkOrder",
+        entity_id=str(order.id),
+        user_id=user_id,
+        details={
+            "work_order_number": order.work_order_number,
+            "reason": reason or "Pause execution requested"
+        }
+    )
+
+    await db.commit()
+    return await get_work_order_by_id(db, order.id)  # type: ignore
+
+
+async def resume_production_execution(
+    db: AsyncSession,
+    order_id: uuid.UUID,
+    user_id: uuid.UUID,
+    user_roles: Optional[List[str]] = None
+) -> WorkOrder:
+    """
+    Resumes a PAUSED work order execution. Sets assigned machine back to IN_USE.
+    """
+    order = await get_work_order_by_id(db, order_id)
+
+    if order.status != WorkOrderStatus.PAUSED:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Cannot resume work order in '{order.status.value}' status. Must be 'PAUSED'."
+        )
+
+    if order.assigned_machine and order.assigned_machine.status in ("MAINTENANCE", "INACTIVE"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Assigned machine '{order.assigned_machine.machine_code}' is currently in {order.assigned_machine.status} state."
+        )
+
+    order.status = WorkOrderStatus.IN_PROGRESS
+    if order.assigned_machine and order.assigned_machine.status != "MAINTENANCE":
+        order.assigned_machine.status = "IN_USE"
+
+    await log_audit_event(
+        db,
+        action="WORK_ORDER_RESUMED",
+        entity_type="WorkOrder",
+        entity_id=str(order.id),
+        user_id=user_id,
+        details={"work_order_number": order.work_order_number}
+    )
+
+    await db.commit()
+    return await get_work_order_by_id(db, order.id)  # type: ignore
+
+
+async def complete_production_execution(
+    db: AsyncSession,
+    order_id: uuid.UUID,
+    complete_in: WorkOrderCompleteRequest,
+    user_id: uuid.UUID,
+    user_roles: Optional[List[str]] = None
+) -> WorkOrder:
+    """
+    Completes production execution for a Work Order in IN_PROGRESS or PAUSED state.
+    Records produced_quantity, actual_completion_time, and restores machine status to OPERATIONAL.
+    """
+    order = await get_work_order_by_id(db, order_id)
+
+    if order.status not in (WorkOrderStatus.IN_PROGRESS, WorkOrderStatus.PAUSED):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Cannot complete work order in '{order.status.value}' status. Must be 'IN_PROGRESS' or 'PAUSED'."
+        )
+
+    if complete_in.produced_quantity <= 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="produced_quantity must be greater than 0"
+        )
+
+    order.produced_quantity = complete_in.produced_quantity
+    order.actual_completion_time = datetime.now(timezone.utc)
+    order.status = WorkOrderStatus.COMPLETED
+
+    if complete_in.notes:
+        order.notes = f"{order.notes}\nCompletion Notes: {complete_in.notes}" if order.notes else complete_in.notes
+
+    if order.assigned_machine and order.assigned_machine.status == "IN_USE":
+        order.assigned_machine.status = "OPERATIONAL"
+
+    await log_audit_event(
+        db,
+        action="WORK_ORDER_COMPLETED",
+        entity_type="WorkOrder",
+        entity_id=str(order.id),
+        user_id=user_id,
+        details={
+            "work_order_number": order.work_order_number,
+            "planned_quantity": order.planned_quantity,
+            "produced_quantity": order.produced_quantity,
+            "actual_completion_time": str(order.actual_completion_time)
+        }
+    )
+
+    await db.commit()
+    return await get_work_order_by_id(db, order.id)  # type: ignore
+
+
+async def record_downtime(
+    db: AsyncSession,
+    downtime_in: DowntimeRecordCreate,
+    user_id: uuid.UUID
+) -> DowntimeRecord:
+    """
+    Records a downtime / delay log entry for a Work Order.
+    """
+    order = await get_work_order_by_id(db, downtime_in.work_order_id)
+
+    target_machine_id = downtime_in.machine_id or order.assigned_machine_id
+
+    duration = downtime_in.duration_minutes
+    if duration is None and downtime_in.end_time:
+        diff = downtime_in.end_time - downtime_in.start_time
+        duration = max(0, int(diff.total_seconds() // 60))
+
+    if duration is not None and duration < 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="duration_minutes cannot be negative"
+        )
+
+    downtime = DowntimeRecord(
+        work_order_id=order.id,
+        machine_id=target_machine_id,
+        start_time=downtime_in.start_time,
+        end_time=downtime_in.end_time,
+        duration_minutes=duration,
+        reason=downtime_in.reason.strip().upper(),
+        remarks=downtime_in.remarks.strip() if downtime_in.remarks else None,
+        recorded_by_id=user_id
+    )
+    db.add(downtime)
+    await db.flush()
+
+    await log_audit_event(
+        db,
+        action="DOWNTIME_RECORDED",
+        entity_type="DowntimeRecord",
+        entity_id=str(downtime.id),
+        user_id=user_id,
+        details={
+            "work_order_number": order.work_order_number,
+            "reason": downtime.reason,
+            "duration_minutes": downtime.duration_minutes
+        }
+    )
+
+    await db.commit()
+
+    # Re-query with relationships pre-loaded
+    stmt = (
+        select(DowntimeRecord)
+        .where(DowntimeRecord.id == downtime.id)
+        .options(
+            selectinload(DowntimeRecord.machine),
+            selectinload(DowntimeRecord.recorded_by)
+        )
+    )
+    res = await db.execute(stmt)
+    return res.scalar_one()
+
+
+async def list_downtime_records(
+    db: AsyncSession,
+    order_id: uuid.UUID
+) -> List[DowntimeRecord]:
+    """
+    Lists downtime records associated with a Work Order.
+    """
+    stmt = (
+        select(DowntimeRecord)
+        .where(DowntimeRecord.work_order_id == order_id)
+        .options(
+            selectinload(DowntimeRecord.machine),
+            selectinload(DowntimeRecord.recorded_by)
+        )
+        .order_by(DowntimeRecord.created_at.desc())
+    )
+    res = await db.execute(stmt)
+    return list(res.scalars().all())
+
+
+async def get_work_order_execution(
+    db: AsyncSession,
+    order_id: uuid.UUID
+) -> Dict[str, Any]:
+    """
+    Retrieves complete execution summary for a Work Order.
+    """
+    order = await get_work_order_by_id(db, order_id)
+    downtimes = await list_downtime_records(db, order_id)
+    total_downtime_min = sum(d.duration_minutes or 0 for d in downtimes)
+
+    return {
+        "work_order": order,
+        "downtime_records": downtimes,
+        "total_downtime_minutes": total_downtime_min
+    }

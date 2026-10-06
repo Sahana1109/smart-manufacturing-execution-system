@@ -1,6 +1,7 @@
 import enum
 import uuid
-from sqlalchemy import Column, String, Integer, Date, Text, ForeignKey, Enum as SQLEnum
+from datetime import datetime
+from sqlalchemy import Column, String, Integer, Date, DateTime, Text, ForeignKey, Enum as SQLEnum
 from sqlalchemy.orm import relationship
 from app.db.base import Base, TimestampMixin
 from app.modules.users.models import GUID
@@ -32,8 +33,11 @@ class WorkOrder(Base, TimestampMixin):
     production_plan_id = Column(GUID, ForeignKey("production_plans.id", ondelete="RESTRICT"), nullable=False, index=True)
     product_id = Column(GUID, ForeignKey("products.id", ondelete="RESTRICT"), nullable=False, index=True)
     planned_quantity = Column(Integer, nullable=False)
+    produced_quantity = Column(Integer, nullable=False, default=0)
     start_date = Column(Date, nullable=False)
     due_date = Column(Date, nullable=False)
+    actual_start_time = Column(DateTime(timezone=True), nullable=True)
+    actual_completion_time = Column(DateTime(timezone=True), nullable=True)
     priority = Column(
         SQLEnum(WorkOrderPriority, name="work_order_priority"),
         default=WorkOrderPriority.MEDIUM,
@@ -55,6 +59,42 @@ class WorkOrder(Base, TimestampMixin):
     created_by = relationship("User")
     assigned_machine = relationship("Machine", back_populates="work_orders")
     assigned_employee = relationship("Employee", back_populates="work_orders")
+    downtime_records = relationship("DowntimeRecord", back_populates="work_order", cascade="all, delete-orphan")
+
+    @property
+    def remaining_quantity(self) -> int:
+        return max(0, self.planned_quantity - (self.produced_quantity or 0))
+
+    @property
+    def progress_percentage(self) -> float:
+        if not self.planned_quantity or self.planned_quantity <= 0:
+            return 0.0
+        return round(min(100.0, ((self.produced_quantity or 0) / self.planned_quantity) * 100.0), 1)
 
     def __repr__(self) -> str:
-        return f"<WorkOrder(number='{self.work_order_number}', status='{self.status}', quantity={self.planned_quantity})>"
+        return f"<WorkOrder(number='{self.work_order_number}', status='{self.status}', planned={self.planned_quantity}, produced={self.produced_quantity})>"
+
+
+class DowntimeRecord(Base, TimestampMixin):
+    """
+    SmartMES Shop Floor Downtime / Delay Record Entity Model
+    """
+    __tablename__ = "downtime_records"
+
+    id = Column(GUID, primary_key=True, default=uuid.uuid4)
+    work_order_id = Column(GUID, ForeignKey("work_orders.id", ondelete="CASCADE"), nullable=False, index=True)
+    machine_id = Column(GUID, ForeignKey("machines.id", ondelete="SET NULL"), nullable=True, index=True)
+    start_time = Column(DateTime(timezone=True), nullable=False)
+    end_time = Column(DateTime(timezone=True), nullable=True)
+    duration_minutes = Column(Integer, nullable=True)
+    reason = Column(String(100), nullable=False)  # e.g. MACHINE_BREAKDOWN, MATERIAL_UNAVAILABLE, OPERATOR_UNAVAILABLE, MAINTENANCE, POWER_FAILURE, OTHER
+    remarks = Column(Text, nullable=True)
+    recorded_by_id = Column(GUID, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+
+    # Relationships
+    work_order = relationship("WorkOrder", back_populates="downtime_records")
+    machine = relationship("Machine")
+    recorded_by = relationship("User")
+
+    def __repr__(self) -> str:
+        return f"<DowntimeRecord(wo_id='{self.work_order_id}', reason='{self.reason}', minutes={self.duration_minutes})>"
