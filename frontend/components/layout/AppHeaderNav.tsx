@@ -42,6 +42,9 @@ export default function AppHeaderNav() {
           <Link href="/shop-floor" className="text-slate-300 hover:text-cyan-300 font-semibold transition-colors">
             Shop Floor
           </Link>
+          <Link href="/quality" className="text-slate-300 hover:text-cyan-300 font-semibold transition-colors">
+            Quality Control
+          </Link>
           <Link href="/machines" className="text-slate-300 hover:text-cyan-300 transition-colors">
             Machines
           </Link>

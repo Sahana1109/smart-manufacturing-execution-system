@@ -7,6 +7,7 @@ from app.modules.production_planning import router as plans_router
 from app.modules.machines import router as machines_router
 from app.modules.employees import router as employees_router
 from app.modules.work_orders import router as work_orders_router
+from app.modules.quality import router as quality_router
 
 api_router = APIRouter()
 
@@ -27,3 +28,7 @@ api_router.include_router(employees_router.router, prefix="/employees", tags=["E
 # Production Planning & Work Orders
 api_router.include_router(plans_router.router, prefix="/production-plans", tags=["Production Planning"])
 api_router.include_router(work_orders_router.router, prefix="/work-orders", tags=["Work Order Management"])
+
+# Quality Inspection & Control
+api_router.include_router(quality_router.router, prefix="/quality", tags=["Quality Inspection & Control"])
+
