@@ -16,6 +16,7 @@ import app.modules.machines.models  # noqa: F401
 import app.modules.employees.models  # noqa: F401
 import app.modules.work_orders.models  # noqa: F401
 import app.modules.quality.models  # noqa: F401
+import app.modules.inventory.models  # noqa: F401
 
 # Alembic Config object
 config = context.config

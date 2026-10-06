@@ -202,3 +202,52 @@ export interface SystemHealth {
     details: string;
   };
 }
+
+export type MaterialUnit = "PCS" | "KG" | "L" | "M" | "OTHER";
+
+export type MovementType = "RECEIPT" | "RESERVATION" | "RELEASE" | "CONSUMPTION" | "ADJUSTMENT";
+
+export interface InventoryStock {
+  id: string;
+  material_id: string;
+  quantity: number;
+  reserved_quantity: number;
+  available_quantity: number;
+  location: string;
+  updated_at: string;
+}
+
+export interface Material {
+  id: string;
+  material_code: string;
+  name: string;
+  description?: string;
+  unit: MaterialUnit;
+  reorder_level: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+  stock?: InventoryStock;
+}
+
+export interface StockMovement {
+  id: string;
+  material_id: string;
+  material_code?: string;
+  material_name?: string;
+  work_order_id?: string;
+  work_order_number?: string;
+  movement_type: MovementType;
+  quantity: number;
+  reference?: string;
+  performed_by_id?: string;
+  performed_by_name?: string;
+  created_at: string;
+}
+
+export interface InventoryDashboardSummary {
+  total_materials: number;
+  total_stock_items: number;
+  low_stock_count: number;
+  total_reserved_quantity: number;
+}
