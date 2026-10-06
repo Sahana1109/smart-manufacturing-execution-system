@@ -1,6 +1,6 @@
 # SMARTMES: Smart Manufacturing Execution & Work Order Management System
 
-SmartMES is an enterprise-oriented, production-ready Manufacturing Execution System designed to digitally orchestrate and monitor the complete manufacturing lifecycle—from production planning and work order execution to inventory tracking, quality control, machine state management, downtime reporting, and barcode identification.
+SmartMES is an enterprise-oriented, production-ready Manufacturing Execution System designed to digitally orchestrate and monitor the complete manufacturing lifecycle—from production planning and work order execution to inventory tracking, quality control, machine state management, downtime reporting, barcode identification, and executive reporting dashboards.
 
 ---
 
@@ -17,19 +17,32 @@ SmartMES bridges the gap between enterprise resource planning (ERP) and shop-flo
 
 ---
 
+## 🚀 Sprints 1–8 Completed Modules Summary
+
+* **Sprint 1 — Authentication & RBAC**: JWT authentication, bcrypt password hashing, 6 granular system roles (`ADMIN`, `PRODUCTION_MANAGER`, `SUPERVISOR`, `QUALITY_INSPECTOR`, `INVENTORY_MANAGER`, `OPERATOR`), protected endpoint decorators.
+* **Sprint 2 — Production Planning**: Product SKU catalog management, multi-priority production planning (`LOW`, `MEDIUM`, `HIGH`, `URGENT`), target quantity tracking, plan status transitions (`DRAFT`, `PLANNED`, `IN_PROGRESS`, `COMPLETED`, `CANCELLED`).
+* **Sprint 3 — Work Order Management**: Work order lifecycle (`DRAFT` → `RELEASED` → `IN_PROGRESS` ↔ `PAUSED` → `COMPLETED` → `CLOSED`/`CANCELLED`), plan linkage, quantity validations, priority routing.
+* **Sprint 4 — Machine & Operator Assignment**: Machine master catalog (`OPERATIONAL`, `IN_USE`, `MAINTENANCE`, `INACTIVE`), operator/employee profiles, machine & operator assignment to work orders, assignment validation rules.
+* **Sprint 5 — Shop Floor Production Execution**: Production execution state machine, start/pause/resume/complete APIs, actual timestamps, produced quantity tracking, machine status auto-synchronization (`IN_USE` / `OPERATIONAL`), shop-floor downtime logging.
+* **Sprint 6 — Quality Inspection & Control**: Quality inspection module (`PENDING`, `PASSED`, `FAILED`, `REWORK_REQUIRED`), defect categorizations (`DIMENSIONAL`, `SURFACE`, `MATERIAL`, `ASSEMBLY`, `FUNCTIONAL`, `COSMETIC`, `OTHER`), severity levels (`LOW`, `MEDIUM`, `HIGH`, `CRITICAL`), accepted vs rejected quantity tracking, quality dashboard.
+* **Sprint 7 — Inventory & Material Tracking**: Material master catalog, practical units (`PCS`, `KG`, `L`, `M`, `OTHER`), stock level tracking (`quantity`, `reserved_quantity`, `available_quantity`), stock movement audit trail (`RECEIPT`, `RESERVATION`, `RELEASE`, `CONSUMPTION`, `ADJUSTMENT`), work order allocation/consumption, low-stock detection (`available_quantity <= reorder_level`), `/inventory` dashboard.
+* **Sprint 8 — Reports & Management Dashboards**: Executive management dashboard (`/dashboard`), 5-row KPI breakdown, Production report, Quality report, Inventory report, Machine report, Operator summary, date range filtering (`from_date`, `to_date`), CSV export capability (`.csv`).
+
+---
+
 ## 🛠️ Technology Stack
 
 | Layer | Technology | Description |
 | :--- | :--- | :--- |
 | **Frontend** | Next.js 14+ (App Router), React 18+, TypeScript | Modern, high-performance web interface |
-| **Styling** | Tailwind CSS, Lucide Icons, Custom CSS System | Clean, high-density industrial dashboard design |
+| **Styling** | Tailwind CSS, Lucide Icons, Custom Glassmorphism CSS | Clean, high-density industrial dashboard design |
 | **Backend** | Python 3.11+, FastAPI, Pydantic v2 | High-concurrency, type-safe REST API framework |
 | **Database** | PostgreSQL 16 | Primary relational storage with ACID compliance |
 | **ORM & Migrations** | SQLAlchemy 2.0 (Async), Alembic | Async database operations and schema migration control |
 | **Caching & Messaging**| Redis 7 | High-speed cache and pub/sub message broker foundation |
 | **Containerization** | Docker, Docker Compose | Multi-container local execution environment |
-| **Testing** | Pytest (Backend), Playwright (Frontend E2E) | Automated unit, integration, and end-to-end testing |
-| **API Spec** | OpenAPI / Swagger | Self-documenting interactive API standard |
+| **Testing** | Pytest (106 unit & integration tests) | Automated test suite with 100% pass rate |
+| **API Spec** | OpenAPI / Swagger | Self-documenting interactive API standard at `/docs` |
 
 ---
 
@@ -38,57 +51,28 @@ SmartMES bridges the gap between enterprise resource planning (ERP) and shop-flo
 ```
 smartmes/
 ├── frontend/             # Next.js App Router (TS, Tailwind CSS)
+│   ├── app/              # App Router Pages (/dashboard, /inventory, /work-orders, etc.)
+│   ├── components/       # UI Components (Modals, Nav, Cards, Layouts)
+│   ├── lib/              # API Client & Auth Context
+│   └── types/            # TypeScript interfaces
 ├── backend/              # FastAPI modular backend application
 │   ├── app/
-│   │   ├── api/          # Global API router and versioned endpoints
+│   │   ├── api/          # Global API router and versioned endpoints (/api/v1)
 │   │   ├── core/         # Settings, security, database & redis connections
 │   │   ├── db/           # Session setup and base model declarative classes
-│   │   └── modules/      # 18 Domain-driven modules (auth, work_orders, etc.)
-│   ├── alembic/          # Database migration environment
-│   └── tests/            # Pytest suite (unit & integration tests)
+│   │   └── modules/      # Domain modules (auth, work_orders, quality, inventory, reports, etc.)
+│   ├── alembic/          # Database migration environment (001 through 006)
+│   └── tests/            # Pytest suite (106 unit, integration, and E2E tests)
 ├── database/             # Database initialization scripts and schemas
-├── tests/                # E2E integration test suite (Playwright framework)
 ├── docs/                 # Architectural specifications, API docs, and sprint plans
-│   ├── requirements/     # SRS (Functional and non-functional requirements)
-│   ├── architecture/     # System architecture and domain boundary specs
-│   ├── database/         # Data model and migration guidelines
-│   ├── api/              # API standard practices
-│   ├── testing/          # QA and testing strategy
-│   ├── agile/            # Sprint roadmap and phase definitions
-│   └── deployment/       # Docker and local deployment guide
+│   ├── agile/            # Sprint documentation (sprint_1 through sprint_8, final_integration)
 ├── docker/               # Container files (Dockerfile.backend, Dockerfile.frontend)
 ├── scripts/              # Developer helper scripts (setup, start, migrate, seed)
-├── .github/              # CI/CD GitHub Actions workflows
 ├── .env.example          # Template for local environment variables
 ├── .gitignore            # Git exclusion rules
 ├── docker-compose.yml    # Multi-container service definition
 └── README.md             # Project overview & quickstart
 ```
-
----
-
-## 🧩 Domain Modules Architecture
-
-Backend and Frontend architectures are organized into 18 domain-focused modules:
-
-1. **Authentication**: JWT token management, login/logout, password hashing.
-2. **Users**: User accounts, profile management, status tracking.
-3. **Roles & Permissions**: Fine-grained Role-Based Access Control (RBAC).
-4. **Products**: Finished goods, raw materials, part catalogs, SKUs.
-5. **Bill of Materials (BOM)**: Multi-level BOM structures, component quantities.
-6. **Suppliers**: Vendor catalogs, lead times, purchasing references.
-7. **Inventory**: Stock levels, stock movements, lot/batch tracking.
-8. **Warehouses**: Warehouse locations, bins, racks, zone management.
-9. **Machines**: Work center registration, machine status, operational capacity.
-10. **Employees**: Operator profiles, shift schedules, skill certifications.
-11. **Production Planning**: Production orders, target quantities, schedules.
-12. **Work Orders**: Dispatching, job routing, status state machines.
-13. **Production Execution**: Operator task execution, output logging, cycle times.
-14. **Quality Inspection**: QA checklists, defect logging, scrap reporting, pass/fail status.
-15. **Downtime**: Machine stoppage reasons, downtime logs, OEE metrics support.
-16. **Reports**: Production performance, yield analytics, summary reports.
-17. **Notifications**: System alerts, machine status change notifications.
-18. **Audit Logs**: Immutable event logs for compliance and security auditing.
 
 ---
 
@@ -134,6 +118,9 @@ source venv/bin/activate
 # Install dependencies
 pip install -r requirements.txt
 
+# Run database migrations
+alembic upgrade head
+
 # Run FastAPI server with auto-reload
 uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ```
@@ -147,6 +134,9 @@ npm install
 
 # Run Next.js development server
 npm run dev
+
+# Or build for production
+npm run build
 ```
 
 ---
@@ -154,16 +144,17 @@ npm run dev
 ## 🧪 Testing
 
 ```bash
-# Backend unit & integration tests
+# Run complete backend test suite (106 tests across Sprints 1–8 & E2E Integration)
 cd smartmes/backend
 pytest
 
-# Frontend E2E tests
-cd smartmes/tests
-npx playwright test
+# Run Next.js frontend production build verification
+cd smartmes/frontend
+npm run build
 ```
 
 ---
 
 ## 📄 License
 Internal SmartMES Development Project - All Rights Reserved.
+
