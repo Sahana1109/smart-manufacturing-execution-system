@@ -12,6 +12,9 @@ import app.modules.roles.models  # noqa: F401
 import app.modules.products.models  # noqa: F401
 import app.modules.production_planning.models  # noqa: F401
 import app.modules.audit_logs.models  # noqa: F401
+import app.modules.machines.models  # noqa: F401
+import app.modules.employees.models  # noqa: F401
+import app.modules.work_orders.models  # noqa: F401
 
 # Alembic Config object
 config = context.config

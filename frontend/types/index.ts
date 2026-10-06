@@ -1,10 +1,12 @@
-export type WorkOrderStatus = "DRAFT" | "RELEASED" | "IN_PROGRESS" | "PAUSED" | "COMPLETED" | "CLOSED";
+export type WorkOrderStatus = "DRAFT" | "RELEASED" | "IN_PROGRESS" | "PAUSED" | "COMPLETED" | "CLOSED" | "CANCELLED";
 
-export type MachineStatus = "OPERATIONAL" | "IDLE" | "MAINTENANCE" | "OFFLINE" | "ERROR";
+export type WorkOrderPriority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
 
 export type ProductionPlanStatus = "DRAFT" | "PLANNED" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED";
 
 export type ProductionPlanPriority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
+
+export type MachineStatus = "OPERATIONAL" | "IDLE" | "MAINTENANCE" | "OFFLINE" | "ERROR";
 
 export interface Role {
   id: number;
@@ -51,8 +53,60 @@ export interface ProductionPlan {
   updated_at: string;
 }
 
+export interface Machine {
+  id: string;
+  machine_code: string;
+  name: string;
+  status: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Employee {
+  id: string;
+  employee_code: string;
+  first_name: string;
+  last_name: string;
+  role_title?: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface WorkOrder {
+  id: string;
+  work_order_number: string;
+  production_plan_id: string;
+  production_plan?: ProductionPlan;
+  product_id: string;
+  product?: Product;
+  planned_quantity: number;
+  start_date: string;
+  due_date: string;
+  priority: WorkOrderPriority;
+  status: WorkOrderStatus;
+  notes?: string;
+  created_by_id?: string;
+  created_by?: User;
+  assigned_machine_id?: string;
+  assigned_machine?: Machine;
+  assigned_employee_id?: string;
+  assigned_employee?: Employee;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface PaginatedProductionPlans {
   items: ProductionPlan[];
+  total: number;
+  page: number;
+  limit: number;
+  pages: number;
+}
+
+export interface PaginatedWorkOrders {
+  items: WorkOrder[];
   total: number;
   page: number;
   limit: number;
