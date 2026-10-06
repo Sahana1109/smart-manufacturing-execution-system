@@ -63,6 +63,34 @@ export function AssignWorkOrderModal({ workOrder, isOpen, onClose, onSuccess }: 
     }
   };
 
+  const handleUnassignMachine = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      await api.delete(`/work-orders/${workOrder.id}/assign/machine`);
+      setAssignedMachineId("");
+      onSuccess();
+    } catch (err: any) {
+      setError(err?.error?.message || err?.message || "Failed to unassign machine.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUnassignEmployee = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      await api.delete(`/work-orders/${workOrder.id}/assign/employee`);
+      setAssignedEmployeeId("");
+      onSuccess();
+    } catch (err: any) {
+      setError(err?.error?.message || err?.message || "Failed to unassign operator.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
       <div className="bg-slate-900 border border-slate-800 rounded-xl max-w-md w-full p-6 shadow-2xl space-y-6">
@@ -83,9 +111,21 @@ export function AssignWorkOrderModal({ workOrder, isOpen, onClose, onSuccess }: 
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">
-              Select Shop Floor Machine
-            </label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400">
+                Select Shop Floor Machine
+              </label>
+              {workOrder.assigned_machine_id && (
+                <button
+                  type="button"
+                  onClick={handleUnassignMachine}
+                  disabled={loading}
+                  className="text-xs text-rose-400 hover:text-rose-300 underline font-medium"
+                >
+                  Unassign Machine
+                </button>
+              )}
+            </div>
             <select
               value={assignedMachineId}
               onChange={(e) => setAssignedMachineId(e.target.value)}
@@ -93,7 +133,11 @@ export function AssignWorkOrderModal({ workOrder, isOpen, onClose, onSuccess }: 
             >
               <option value="">-- No Machine Assigned --</option>
               {machines.map((m) => (
-                <option key={m.id} value={m.id}>
+                <option
+                  key={m.id}
+                  value={m.id}
+                  disabled={m.status === "MAINTENANCE" || m.status === "INACTIVE"}
+                >
                   {m.machine_code} — {m.name} [{m.status}]
                 </option>
               ))}
@@ -101,9 +145,21 @@ export function AssignWorkOrderModal({ workOrder, isOpen, onClose, onSuccess }: 
           </div>
 
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">
-              Select Assigned Operator / Employee
-            </label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400">
+                Select Assigned Operator / Employee
+              </label>
+              {workOrder.assigned_employee_id && (
+                <button
+                  type="button"
+                  onClick={handleUnassignEmployee}
+                  disabled={loading}
+                  className="text-xs text-rose-400 hover:text-rose-300 underline font-medium"
+                >
+                  Unassign Operator
+                </button>
+              )}
+            </div>
             <select
               value={assignedEmployeeId}
               onChange={(e) => setAssignedEmployeeId(e.target.value)}

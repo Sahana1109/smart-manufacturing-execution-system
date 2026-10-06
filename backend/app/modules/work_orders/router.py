@@ -149,6 +149,44 @@ async def assign_work_order(
     return await wo_service.assign_work_order(db, order_id, assign_in, user_id=current_user.id)
 
 
+@router.delete(
+    "/{order_id}/assign/machine",
+    response_model=WorkOrderResponse,
+    summary="Unassign machine from work order (Admin / Production Manager / Supervisor)",
+    dependencies=[Depends(require_roles("ADMIN", "PRODUCTION_MANAGER", "SUPERVISOR"))]
+)
+async def unassign_machine_from_work_order(
+    order_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Unassigns machine from a work order.
+    """
+    return await wo_service.unassign_work_order_resource(
+        db, order_id, unassign_machine=True, user_id=current_user.id
+    )
+
+
+@router.delete(
+    "/{order_id}/assign/employee",
+    response_model=WorkOrderResponse,
+    summary="Unassign employee operator from work order (Admin / Production Manager / Supervisor)",
+    dependencies=[Depends(require_roles("ADMIN", "PRODUCTION_MANAGER", "SUPERVISOR"))]
+)
+async def unassign_employee_from_work_order(
+    order_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Unassigns employee operator from a work order.
+    """
+    return await wo_service.unassign_work_order_resource(
+        db, order_id, unassign_employee=True, user_id=current_user.id
+    )
+
+
 @router.post(
     "/{order_id}/cancel",
     response_model=WorkOrderResponse,

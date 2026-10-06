@@ -335,6 +335,18 @@ async def change_work_order_status(
 
     order.status = target_status
 
+    # Auto-synchronize assigned machine status during execution transitions
+    if order.assigned_machine_id:
+        m_stmt = select(Machine).where(Machine.id == order.assigned_machine_id)
+        m_res = await db.execute(m_stmt)
+        machine = m_res.scalar_one_or_none()
+        if machine and machine.status != "MAINTENANCE" and machine.status != "INACTIVE":
+            if target_status == WorkOrderStatus.IN_PROGRESS:
+                machine.status = "IN_USE"
+            elif target_status in (WorkOrderStatus.COMPLETED, WorkOrderStatus.CLOSED, WorkOrderStatus.CANCELLED, WorkOrderStatus.PAUSED):
+                if machine.status == "IN_USE":
+                    machine.status = "OPERATIONAL"
+
     await log_audit_event(
         db,
         action="WORK_ORDER_STATUS_CHANGED",
@@ -362,6 +374,12 @@ async def assign_work_order(
     """
     order = await get_work_order_by_id(db, order_id)
 
+    if order.status in (WorkOrderStatus.COMPLETED, WorkOrderStatus.CLOSED, WorkOrderStatus.CANCELLED):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Cannot assign resources to a work order in '{order.status.value}' state"
+        )
+
     if assign_in.assigned_machine_id is not None:
         m_stmt = select(Machine).where(Machine.id == assign_in.assigned_machine_id)
         m_res = await db.execute(m_stmt)
@@ -371,7 +389,18 @@ async def assign_work_order(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Assigned machine does not exist or is inactive"
             )
+        if m.status in ("MAINTENANCE", "INACTIVE"):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Cannot assign machine '{m.machine_code}' in {m.status} status"
+            )
+
         order.assigned_machine_id = assign_in.assigned_machine_id
+
+        # If WO is currently IN_PROGRESS, set machine to IN_USE
+        if order.status == WorkOrderStatus.IN_PROGRESS:
+            m.status = "IN_USE"
+
         await log_audit_event(
             db,
             action="WORK_ORDER_MACHINE_ASSIGNED",
@@ -399,6 +428,54 @@ async def assign_work_order(
             user_id=user_id,
             details={"employee_code": emp.employee_code, "employee_name": f"{emp.first_name} {emp.last_name}"}
         )
+
+    await db.commit()
+    return await get_work_order_by_id(db, order.id)  # type: ignore
+
+
+async def unassign_work_order_resource(
+    db: AsyncSession,
+    order_id: uuid.UUID,
+    unassign_machine: bool = False,
+    unassign_employee: bool = False,
+    user_id: Optional[uuid.UUID] = None
+) -> WorkOrder:
+    """
+    Unassigns machine and/or employee from a work order.
+    """
+    order = await get_work_order_by_id(db, order_id)
+
+    if order.status in (WorkOrderStatus.COMPLETED, WorkOrderStatus.CLOSED, WorkOrderStatus.CANCELLED):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Cannot modify assignments for a work order in '{order.status.value}' state"
+        )
+
+    if unassign_machine and order.assigned_machine_id:
+        if order.assigned_machine and order.assigned_machine.status == "IN_USE":
+            order.assigned_machine.status = "OPERATIONAL"
+        order.assigned_machine_id = None
+        if user_id:
+            await log_audit_event(
+                db,
+                action="WORK_ORDER_MACHINE_UNASSIGNED",
+                entity_type="WorkOrder",
+                entity_id=str(order.id),
+                user_id=user_id,
+                details={"work_order_number": order.work_order_number}
+            )
+
+    if unassign_employee and order.assigned_employee_id:
+        order.assigned_employee_id = None
+        if user_id:
+            await log_audit_event(
+                db,
+                action="WORK_ORDER_EMPLOYEE_UNASSIGNED",
+                entity_type="WorkOrder",
+                entity_id=str(order.id),
+                user_id=user_id,
+                details={"work_order_number": order.work_order_number}
+            )
 
     await db.commit()
     return await get_work_order_by_id(db, order.id)  # type: ignore
