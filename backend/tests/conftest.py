@@ -1,5 +1,6 @@
 import pytest
 import pytest_asyncio
+from datetime import date, timedelta
 from typing import AsyncGenerator
 from httpx import AsyncClient, ASGITransport
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
@@ -12,6 +13,9 @@ from app.core.security import get_password_hash, create_access_token
 from app.modules.users.models import User
 from app.modules.roles.models import Role
 from app.modules.products.models import Product
+from app.modules.production_planning.models import ProductionPlan, ProductionPlanStatus, ProductionPlanPriority
+from app.modules.machines.models import Machine
+from app.modules.employees.models import Employee
 
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
 
@@ -90,6 +94,56 @@ async def sample_product(db_session: AsyncSession) -> Product:
 
 
 @pytest_asyncio.fixture
+async def sample_plan(db_session: AsyncSession, sample_product: Product, sample_manager: User) -> ProductionPlan:
+    """
+    Fixture creating an active test production plan.
+    """
+    plan = ProductionPlan(
+        plan_number="PP-TEST-001",
+        product_id=sample_product.id,
+        planned_quantity=200,
+        start_date=date.today(),
+        due_date=date.today() + timedelta(days=7),
+        priority=ProductionPlanPriority.MEDIUM,
+        status=ProductionPlanStatus.PLANNED,
+        created_by_id=sample_manager.id
+    )
+    db_session.add(plan)
+    await db_session.commit()
+    await db_session.refresh(plan)
+    return plan
+
+
+@pytest_asyncio.fixture
+async def sample_machine(db_session: AsyncSession) -> Machine:
+    m = Machine(
+        machine_code="TEST-MAC-01",
+        name="Test CNC Mill",
+        status="OPERATIONAL",
+        is_active=True
+    )
+    db_session.add(m)
+    await db_session.commit()
+    await db_session.refresh(m)
+    return m
+
+
+@pytest_asyncio.fixture
+async def sample_employee(db_session: AsyncSession) -> Employee:
+    e = Employee(
+        employee_code="TEST-EMP-01",
+        first_name="John",
+        last_name="Doe",
+        role_title="CNC Operator",
+        is_active=True
+    )
+    db_session.add(e)
+    await db_session.commit()
+    await db_session.refresh(e)
+    return e
+
+
+@pytest_asyncio.fixture
 async def sample_admin(db_session: AsyncSession) -> User:
     admin_role = await db_session.get(Role, 1)
     user = User(
@@ -126,6 +180,24 @@ async def sample_manager(db_session: AsyncSession) -> User:
 
 
 @pytest_asyncio.fixture
+async def sample_supervisor(db_session: AsyncSession) -> User:
+    supervisor_role = await db_session.get(Role, 3)
+    user = User(
+        email="supervisor@test.com",
+        username="shop_supervisor",
+        password_hash=get_password_hash("SupervisorPass123!"),
+        first_name="Shop",
+        last_name="Supervisor",
+        is_active=True,
+        roles=[supervisor_role] if supervisor_role else []
+    )
+    db_session.add(user)
+    await db_session.commit()
+    await db_session.refresh(user)
+    return user
+
+
+@pytest_asyncio.fixture
 async def sample_operator(db_session: AsyncSession) -> User:
     operator_role = await db_session.get(Role, 4)
     user = User(
@@ -152,6 +224,12 @@ def admin_token_headers(sample_admin: User) -> dict:
 @pytest_asyncio.fixture
 def manager_token_headers(sample_manager: User) -> dict:
     token = create_access_token(subject=sample_manager.id)
+    return {"Authorization": f"Bearer {token}"}
+
+
+@pytest_asyncio.fixture
+def supervisor_token_headers(sample_supervisor: User) -> dict:
+    token = create_access_token(subject=sample_supervisor.id)
     return {"Authorization": f"Bearer {token}"}
 
 

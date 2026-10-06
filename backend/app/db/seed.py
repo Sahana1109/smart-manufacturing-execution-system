@@ -9,6 +9,8 @@ from app.core.security import get_password_hash
 from app.modules.roles.models import Role
 from app.modules.users.models import User
 from app.modules.products.models import Product
+from app.modules.machines.models import Machine
+from app.modules.employees.models import Employee
 
 logger = logging.getLogger(__name__)
 
@@ -27,21 +29,29 @@ INITIAL_PRODUCTS = [
     {"product_code": "PRD-GEAR-003", "name": "Heavy Duty Spur Gear Assembly", "description": "Hardened steel transmission gear assembly", "unit_of_measure": "SETS"},
 ]
 
+INITIAL_MACHINES = [
+    {"machine_code": "MAC-CNC-01", "name": "Haas VF-4SS 5-Axis CNC Milling Center", "status": "OPERATIONAL"},
+    {"machine_code": "MAC-INJ-02", "name": "Engel Victory 250T Injection Molding Press", "status": "OPERATIONAL"},
+]
+
+INITIAL_EMPLOYEES = [
+    {"employee_code": "EMP-001", "first_name": "Marcus", "last_name": "Vance", "role_title": "Lead CNC Operator"},
+    {"employee_code": "EMP-002", "first_name": "Elena", "last_name": "Rostova", "role_title": "Senior Assembly Technician"},
+]
+
 
 async def seed_db(db: AsyncSession) -> None:
     """
-    Seeds initial default roles, sample products, and a development administrator account.
+    Seeds initial default roles, sample products, machines, employees, and a development administrator account.
     """
     # 1. Seed Roles
     logger.info("Checking initial roles...")
     for role_data in INITIAL_ROLES:
         stmt = select(Role).where(Role.name == role_data["name"])
         res = await db.execute(stmt)
-        existing = res.scalar_one_or_none()
-        if not existing:
+        if not res.scalar_one_or_none():
             logger.info(f"Seeding role: {role_data['name']}")
-            role = Role(name=role_data["name"], description=role_data["description"])
-            db.add(role)
+            db.add(Role(name=role_data["name"], description=role_data["description"]))
     await db.commit()
 
     # 2. Seed Sample Products
@@ -49,20 +59,32 @@ async def seed_db(db: AsyncSession) -> None:
     for prod_data in INITIAL_PRODUCTS:
         stmt = select(Product).where(Product.product_code == prod_data["product_code"])
         res = await db.execute(stmt)
-        existing_prod = res.scalar_one_or_none()
-        if not existing_prod:
+        if not res.scalar_one_or_none():
             logger.info(f"Seeding product: {prod_data['product_code']}")
-            prod = Product(
-                product_code=prod_data["product_code"],
-                name=prod_data["name"],
-                description=prod_data["description"],
-                unit_of_measure=prod_data["unit_of_measure"],
-                is_active=True
-            )
-            db.add(prod)
+            db.add(Product(**prod_data, is_active=True))
     await db.commit()
 
-    # 3. Seed Admin User
+    # 3. Seed Sample Machines
+    logger.info("Checking initial sample machines...")
+    for m_data in INITIAL_MACHINES:
+        stmt = select(Machine).where(Machine.machine_code == m_data["machine_code"])
+        res = await db.execute(stmt)
+        if not res.scalar_one_or_none():
+            logger.info(f"Seeding machine: {m_data['machine_code']}")
+            db.add(Machine(**m_data, is_active=True))
+    await db.commit()
+
+    # 4. Seed Sample Employees
+    logger.info("Checking initial sample employees...")
+    for e_data in INITIAL_EMPLOYEES:
+        stmt = select(Employee).where(Employee.employee_code == e_data["employee_code"])
+        res = await db.execute(stmt)
+        if not res.scalar_one_or_none():
+            logger.info(f"Seeding employee: {e_data['employee_code']}")
+            db.add(Employee(**e_data, is_active=True))
+    await db.commit()
+
+    # 5. Seed Admin User
     admin_email = os.getenv("INITIAL_ADMIN_EMAIL", "admin@smartmes.local")
     admin_username = os.getenv("INITIAL_ADMIN_USERNAME", "admin")
     admin_password = os.getenv("INITIAL_ADMIN_PASSWORD", "SmartMES_DevAdminPass_2026!")

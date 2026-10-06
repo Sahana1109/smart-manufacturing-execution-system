@@ -36,6 +36,9 @@ export default function AppHeaderNav() {
           <Link href="/production-plans" className="text-slate-300 hover:text-cyan-300 transition-colors">
             Production Planning
           </Link>
+          <Link href="/work-orders" className="text-slate-300 hover:text-cyan-300 transition-colors">
+            Work Orders
+          </Link>
           <Link href="/health" className="text-slate-400 hover:text-slate-200 transition-colors">
             Diagnostics
           </Link>
