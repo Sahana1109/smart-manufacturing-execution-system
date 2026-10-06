@@ -115,8 +115,54 @@ export interface WorkOrder {
   assigned_employee_id?: string;
   assigned_employee?: Employee;
   downtime_records?: DowntimeRecord[];
+  quality_status?: string;
   created_at: string;
   updated_at: string;
+}
+
+export type QualityStatus = "PENDING" | "PASSED" | "FAILED" | "REWORK_REQUIRED";
+
+export type DefectType = "DIMENSIONAL" | "SURFACE" | "MATERIAL" | "ASSEMBLY" | "FUNCTIONAL" | "COSMETIC" | "OTHER";
+
+export type DefectSeverity = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+
+export interface QualityDefect {
+  id: string;
+  inspection_id: string;
+  defect_type: DefectType;
+  severity: DefectSeverity;
+  description?: string;
+  quantity: number;
+  remarks?: string;
+  created_at: string;
+}
+
+export interface QualityInspection {
+  id: string;
+  work_order_id: string;
+  inspector_id?: string;
+  inspected_quantity: number;
+  accepted_quantity: number;
+  rejected_quantity: number;
+  status: QualityStatus;
+  remarks?: string;
+  inspection_date: string;
+  created_at: string;
+  updated_at: string;
+  work_order_number?: string;
+  product_name?: string;
+  inspector_name?: string;
+  defects?: QualityDefect[];
+}
+
+export interface QualitySummary {
+  total_inspections: number;
+  pending: number;
+  passed: number;
+  failed: number;
+  rework_required: number;
+  total_rejected_quantity: number;
+  total_defects: number;
 }
 
 export interface WorkOrderExecution {

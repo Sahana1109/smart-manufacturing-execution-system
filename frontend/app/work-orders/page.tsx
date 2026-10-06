@@ -70,6 +70,21 @@ export default function WorkOrdersPage() {
     );
   };
 
+  const qualityBadge = (qStatus?: string) => {
+    const status = qStatus || "PENDING";
+    const styles: Record<string, string> = {
+      PENDING: "bg-slate-800 text-slate-300 border-slate-700",
+      PASSED: "bg-emerald-950 text-emerald-400 border-emerald-800",
+      FAILED: "bg-rose-950 text-rose-400 border-rose-800",
+      REWORK_REQUIRED: "bg-amber-950 text-amber-400 border-amber-800",
+    };
+    return (
+      <span className={`px-2 py-0.5 text-[10px] rounded-md border font-semibold ${styles[status] || styles.PENDING}`}>
+        QA: {status.replace("_", " ")}
+      </span>
+    );
+  };
+
   const priorityBadge = (priority: string) => {
     const styles: Record<string, string> = {
       LOW: "text-slate-400",
@@ -257,7 +272,12 @@ export default function WorkOrdersPage() {
                       <div>Due: {order.due_date}</div>
                     </td>
                     <td className="px-6 py-4">{priorityBadge(order.priority)}</td>
-                    <td className="px-6 py-4">{statusBadge(order.status)}</td>
+                    <td className="px-6 py-4 space-y-1">
+                      <div>{statusBadge(order.status)}</div>
+                      {order.status === "COMPLETED" && (
+                        <div>{qualityBadge(order.quality_status)}</div>
+                      )}
+                    </td>
                     <td className="px-6 py-4 text-right flex items-center justify-end gap-2">
                       {canAssign && order.status !== "CLOSED" && order.status !== "CANCELLED" && (
                         <button

@@ -237,3 +237,28 @@ def supervisor_token_headers(sample_supervisor: User) -> dict:
 def operator_token_headers(sample_operator: User) -> dict:
     token = create_access_token(subject=sample_operator.id)
     return {"Authorization": f"Bearer {token}"}
+
+
+@pytest_asyncio.fixture
+async def sample_inspector(db_session: AsyncSession) -> User:
+    inspector_role = await db_session.get(Role, 5)
+    user = User(
+        email="inspector@test.com",
+        username="quality_inspector",
+        password_hash=get_password_hash("InspectorPass123!"),
+        first_name="Quality",
+        last_name="Inspector",
+        is_active=True,
+        roles=[inspector_role] if inspector_role else []
+    )
+    db_session.add(user)
+    await db_session.commit()
+    await db_session.refresh(user)
+    return user
+
+
+@pytest_asyncio.fixture
+def inspector_token_headers(sample_inspector: User) -> dict:
+    token = create_access_token(subject=sample_inspector.id)
+    return {"Authorization": f"Bearer {token}"}
+

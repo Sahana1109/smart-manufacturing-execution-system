@@ -176,6 +176,7 @@ async def get_work_order_by_id(db: AsyncSession, order_id: uuid.UUID) -> WorkOrd
             selectinload(WorkOrder.created_by),
             selectinload(WorkOrder.assigned_machine),
             selectinload(WorkOrder.assigned_employee),
+            selectinload(WorkOrder.inspections),
             selectinload(WorkOrder.downtime_records).selectinload(DowntimeRecord.machine),
             selectinload(WorkOrder.downtime_records).selectinload(DowntimeRecord.recorded_by)
         )
@@ -209,7 +210,8 @@ async def list_work_orders(
         selectinload(WorkOrder.production_plan),
         selectinload(WorkOrder.created_by),
         selectinload(WorkOrder.assigned_machine),
-        selectinload(WorkOrder.assigned_employee)
+        selectinload(WorkOrder.assigned_employee),
+        selectinload(WorkOrder.inspections)
     )
     
     conditions = []

@@ -196,6 +196,21 @@ export default function ShopFloorPage() {
                       <div className="flex items-center gap-2">
                         <span className="font-mono font-bold text-lg text-white">{order.work_order_number}</span>
                         {statusBadge(order.status)}
+                        {order.status === "COMPLETED" && (
+                          <span
+                            className={`px-2.5 py-1 text-xs rounded-full border font-semibold ${
+                              order.quality_status === "PASSED"
+                                ? "bg-emerald-950 text-emerald-400 border-emerald-800"
+                                : order.quality_status === "FAILED"
+                                ? "bg-rose-950 text-rose-400 border-rose-800"
+                                : order.quality_status === "REWORK_REQUIRED"
+                                ? "bg-amber-950 text-amber-400 border-amber-800"
+                                : "bg-slate-800 text-slate-300 border-slate-700"
+                            }`}
+                          >
+                            QA: {(order.quality_status || "PENDING").replace("_", " ")}
+                          </span>
+                        )}
                       </div>
                       <span className="text-xs font-semibold uppercase text-purple-400 bg-purple-950/60 px-2 py-0.5 rounded border border-purple-800">
                         {order.priority}

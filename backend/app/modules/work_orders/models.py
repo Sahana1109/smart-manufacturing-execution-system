@@ -60,6 +60,7 @@ class WorkOrder(Base, TimestampMixin):
     assigned_machine = relationship("Machine", back_populates="work_orders")
     assigned_employee = relationship("Employee", back_populates="work_orders")
     downtime_records = relationship("DowntimeRecord", back_populates="work_order", cascade="all, delete-orphan")
+    inspections = relationship("QualityInspection", back_populates="work_order", cascade="all, delete-orphan", order_by="desc(QualityInspection.created_at)")
 
     @property
     def remaining_quantity(self) -> int:
@@ -70,6 +71,14 @@ class WorkOrder(Base, TimestampMixin):
         if not self.planned_quantity or self.planned_quantity <= 0:
             return 0.0
         return round(min(100.0, ((self.produced_quantity or 0) / self.planned_quantity) * 100.0), 1)
+
+    @property
+    def quality_status(self) -> str:
+        if "inspections" in self.__dict__ and self.inspections:
+            latest = self.inspections[0]
+            status_val = latest.status
+            return status_val.value if hasattr(status_val, 'value') else str(status_val)
+        return "PENDING"
 
     def __repr__(self) -> str:
         return f"<WorkOrder(number='{self.work_order_number}', status='{self.status}', planned={self.planned_quantity}, produced={self.produced_quantity})>"

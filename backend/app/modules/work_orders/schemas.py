@@ -102,6 +102,7 @@ class WorkOrderResponse(BaseModel):
     actual_completion_time: Optional[datetime] = None
     priority: WorkOrderPriority
     status: WorkOrderStatus
+    quality_status: Optional[str] = "PENDING"
     notes: Optional[str] = None
     created_by_id: Optional[uuid.UUID] = None
     created_by: Optional[UserResponse] = None
